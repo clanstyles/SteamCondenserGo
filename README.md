@@ -23,3 +23,7 @@ I have another project that needs to query and cache many game servers. Go Lang 
 
 
 All of the packet formatting was found over at the offical Valve developer wiki: https://developer.valvesoftware.com/wiki/
+
+
+### License
+This is released under BSD - have fun!
