@@ -1,15 +1,11 @@
 package servers
 
 import (
-	"SteamCondenser/helpers"
-	"fmt"
+	"SteamCondenserGo/helpers"
 	"net"
 )
 
-type Request struct {
-	Header  byte
-	Payload string
-}
+type GoldServer server
 
 type Response struct {
 	Header     byte
@@ -28,15 +24,17 @@ type Response struct {
 	Vac        byte
 }
 
-func GetInfo(address string) Response {
-	serverAddr, err := net.ResolveUDPAddr("udp", address)
+func (model GoldServer) GetInfo() (Response, error) {
+	resp := Response{}
+
+	serverAddr, err := net.ResolveUDPAddr("udp", model.Address)
 	if err != nil {
-		panic(err)
+		return resp, err
 	}
 
 	socket, err := net.DialUDP("udp", nil, serverAddr)
 	if err != nil {
-		panic(err)
+		return resp, err
 	}
 	defer socket.Close()
 
@@ -55,11 +53,11 @@ func GetInfo(address string) Response {
 		panic(err)
 	}
 
-	return bufferToResponse(data)
+	resp.bufferToResponse(data)
+	return resp, nil
 }
 
-func bufferToResponse(b []byte) Response {
-	resp := Response{}
+func (resp *Response) bufferToResponse(b []byte) {
 	position := 4
 
 	header, position := helpers.ReadByte(b, position)
@@ -91,6 +89,4 @@ func bufferToResponse(b []byte) Response {
 	resp.Enviorment = enviorment
 	resp.Visibility = visibility
 	resp.Vac = vac
-
-	return resp
 }

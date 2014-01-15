@@ -1,8 +1,18 @@
 package servers
 
-type Server struct {
+type server struct {
 	Address string
-	Port    int
+}
+
+type GameServerResponse struct {
+	Name       string
+	Map        string
+	Game       string
+	Players    byte
+	MaxPlayers byte
+	Bots       byte
+	ServerType byte
+	Secured    bool
 }
 
 func CreateRequest() []byte {
