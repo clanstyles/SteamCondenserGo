@@ -15,7 +15,7 @@ func main() {
 	//Print(response)
 
 	minecraftServer := servers.MinecraftServer{
-		Address: "mc.ecocitycraft.com:25565",
+		Address: "178.32.48.244:25565",
 	}
 	response, err := minecraftServer.GetInfo()
 	fmt.Println(err)
