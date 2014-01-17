@@ -3,19 +3,20 @@ package servers
 import (
 	"SteamCondenserGo/helpers"
 	"net"
+	"fmt"
 )
 
 type GoldServer server
 
-type Response struct {
+type serverResponse struct {
 	Header     byte
 	Protocol   byte
-	Name       string
+	Hostname   string
 	Map        string
 	Folder     string
 	AppId      int64
 	Game       string
-	Players    byte
+	NumPlayers byte
 	MaxPlayers byte
 	Bots       byte
 	ServerType byte
@@ -24,8 +25,8 @@ type Response struct {
 	Vac        byte
 }
 
-func (model GoldServer) GetInfo() (Response, error) {
-	resp := Response{}
+func (model GoldServer) GetInfo() (serverResponse, error) {
+	resp := serverResponse{}
 
 	serverAddr, err := net.ResolveUDPAddr("udp", model.Address)
 	if err != nil {
@@ -39,7 +40,7 @@ func (model GoldServer) GetInfo() (Response, error) {
 	defer socket.Close()
 
 	query := helpers.CreateNullTermByteString("TSource Engine Query")
-	send := CreateRequest()
+	send := createPacket()
 	send = append(send, query...)
 
 	_, err = socket.Write(send)
@@ -57,36 +58,40 @@ func (model GoldServer) GetInfo() (Response, error) {
 	return resp, nil
 }
 
-func (resp *Response) bufferToResponse(b []byte) {
-	position := 4
+func (resp *serverResponse) bufferToResponse(b []byte) {
 
-	header, position := helpers.ReadByte(b, position)
-	protocol, position := helpers.ReadByte(b, position)
-	name, position := helpers.ReadNullTermString(b, position)
-	serverMap, position := helpers.ReadNullTermString(b, position)
-	folder, position := helpers.ReadNullTermString(b, position)
-	game, position := helpers.ReadNullTermString(b, position)
-	appId, position := helpers.ReadShort(b, position)
-	players, position := helpers.ReadByte(b, position)
-	maxPlayers, position := helpers.ReadByte(b, position)
-	bots, position := helpers.ReadByte(b, position)
-	serverType, position := helpers.ReadByte(b, position)
-	enviorment, position := helpers.ReadByte(b, position)
-	visibility, position := helpers.ReadByte(b, position)
-	vac, position := helpers.ReadByte(b, position)
+	reader := helpers.Init(4, b)
+	resp.Header = reader.ReadByte()
+	resp.Protocol = reader.ReadByte()
+	resp.Hostname = reader.ReadNullTermString()
+	resp.Map = reader.ReadNullTermString()
+	resp.Folder = reader.ReadNullTermString()
+	resp.Game = reader.ReadNullTermString()
+	resp.AppId = reader.ReadShort()
+	resp.NumPlayers = reader.ReadByte()
+	resp.MaxPlayers = reader.ReadByte()
+	resp.Bots = reader.ReadByte()
+	resp.ServerType = reader.ReadByte()
+	resp.Enviorment = reader.ReadByte()
+	resp.Visibility = reader.ReadByte()
+	resp.Vac = reader.ReadByte()
+}
 
-	resp.Header = header
-	resp.Protocol = protocol
-	resp.Name = name
-	resp.Map = serverMap
-	resp.Folder = folder
-	resp.Game = game
-	resp.AppId = appId
-	resp.Players = players
-	resp.MaxPlayers = maxPlayers
-	resp.Bots = bots
-	resp.ServerType = serverType
-	resp.Enviorment = enviorment
-	resp.Visibility = visibility
-	resp.Vac = vac
+
+func createPacket() []byte {
+	return []byte("\xFF\xFF\xFF\xFF")
+}
+
+func (self serverResponse) PrintDebug() {
+	fmt.Println("Header: ", self.Header)
+	fmt.Println("Protocol: ", self.Protocol)
+	fmt.Println("Hostname: ", self.Hostname)
+	fmt.Println("Map: ", self.Map)
+	fmt.Println("Folder: ", self.Folder)
+	fmt.Println("Game: ", self.Game)
+	fmt.Println("AppId: ", self.AppId)
+	fmt.Println("Players: ", self.NumPlayers, "/", self.MaxPlayers)
+	fmt.Println("Bots: ", self.Bots)
+	fmt.Println("Server Type: ", self.ServerType)
+	fmt.Println("Vac: ", self.Vac)
 }

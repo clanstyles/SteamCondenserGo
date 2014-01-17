@@ -8,13 +8,9 @@ type GameServerResponse struct {
 	Name       string
 	Map        string
 	Game       string
-	Players    byte
-	MaxPlayers byte
-	Bots       byte
-	ServerType byte
+	Players    int
+	MaxPlayers int
+	Bots       int
+	ServerType int
 	Secured    bool
-}
-
-func CreateRequest() []byte {
-	return []byte("\xFF\xFF\xFF\xFF")
 }

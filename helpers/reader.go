@@ -5,28 +5,44 @@ import (
 	"encoding/binary"
 )
 
-func ReadByte(data []byte, position int) (byte, int) {
-	size := 1
-	newPos := position + size
-	ret := data[position:newPos]
-	return ret[0], newPos
+const (
+	intSize = 1
+	shortSize = 2
+)
+
+type responseReader struct {
+	position int
+	data 	[]byte
 }
 
-func ReadShort(data []byte, position int) (int64, int) {
-	size := 2
-	newPos := position + size
-	val := data[position:newPos]
+func Init(p int, data []byte) responseReader {
+	return responseReader {position: p, data: data}
+}
+
+func (self *responseReader)ReadByte() (byte) {
+	newPos := self.position + intSize
+	ret := self.data[self.position:newPos]
+	self.position = newPos
+
+	return ret[0]
+}
+
+func (self *responseReader)ReadShort() (int64) {
+	newPos := self.position + shortSize
+	val := self.data[self.position:newPos]
+	self.position = newPos
+
 	buf := bytes.NewBuffer(val)
-
 	ret, _ := binary.ReadVarint(buf)
-	return ret, newPos
+
+	return ret
 }
 
-func ReadNullTermString(data []byte, position int) (string, int) {
-	newPos := position
+func (self *responseReader)ReadNullTermString() (string) {
+	newPos := self.position
 	result := ""
-	for index, b := range data {
-		if index < position {
+	for index, b := range self.data {
+		if index < self.position {
 			continue
 		}
 
@@ -39,5 +55,6 @@ func ReadNullTermString(data []byte, position int) (string, int) {
 		result += string(b)
 	}
 
-	return result, newPos
+	self.position = newPos
+	return result
 }

@@ -4,17 +4,21 @@ import (
 	"SteamCondenserGo/helpers"
 	"bytes"
 	"encoding/binary"
-	//"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net"
-	//"strconv"
+//	"time"
+	"strconv"
 )
 
 type MinecraftServer server
 
 const (
+	magic1 = 0xFE
+	magic2 = 0xFD
 	statistic = 0x00
 	handshake = 0x09
+	sessionId = 13371
 )
 
 type challengeRequest struct {
@@ -27,10 +31,18 @@ type challengeRequest struct {
 type challengeResponse struct {
 	Type           byte
 	SessionId      int64
-	ChallengeToken []byte
+	ChallengeToken string
 }
 
-type serverResponse struct {
+type mcQueryRequest struct {
+	Magic1    byte
+	Magic2    byte
+	Type      byte
+	SessionId int32
+	Challenge int32
+}
+
+type mcServerResponse struct {
 	Type       byte
 	SessionId  int64
 	Motd       string
@@ -57,56 +69,71 @@ func (self MinecraftServer) GetInfo() (GameServerResponse, error) {
 	}
 	defer conn.Close()
 
-	fmt.Println("Hummm getting challenge")
-	challengeCode, err := doChallengeRequest()
-	if err != nil {
-		return resp, err
-	}
-	fmt.Println("Challenge:", challengeCode)
-
-	fmt.Println("Hummm getting status")
-	serverResponse, err := getStatus(challengeCode)
+	code, err := requestChallengeCode()
 	if err != nil {
 		return resp, err
 	}
 
-	fmt.Println("RESPONSE", serverResponse)
+	basicInfo, err := getStatus(code)
+	if err != nil {
+		return resp, err
+	}
+
+	fmt.Println("Server resposne",basicInfo)
 	return resp, err
 }
 
-func getStatus(challengeCode string) (serverResponse, error) {
-	response := serverResponse{}
-	//command := createPacket(statistic, challengeCode)
-	//conn.Write(command)
+func getStatus(challengeCode string) (mcServerResponse, error) {
+	response := mcServerResponse{}
 
-	fmt.Println("Waiting for read...")
-	data := make([]byte, 2048)
-	_, _, err := conn.ReadFromUDP(data)
+	fmt.Println("Trying to convert challenge code", challengeCode)
+	code, err := strconv.Atoi(challengeCode)
 	if err != nil {
 		return response, err
 	}
 
-	position := 0
-	response.Type, position = helpers.ReadByte(data, position)
-	response.SessionId, position = helpers.ReadShort(data, position)
-	response.Motd, position = helpers.ReadNullTermString(data, position)
-	response.GameType, position = helpers.ReadNullTermString(data, position)
-	response.Map, position = helpers.ReadNullTermString(data, position)
-	response.NumPlayers, position = helpers.ReadNullTermString(data, position)
-	response.MaxPlayers, position = helpers.ReadNullTermString(data, position)
-	response.HostPort, position = helpers.ReadShort(data, position)
-	response.HostIp, position = helpers.ReadNullTermString(data, position)
+	request := mcQueryRequest{
+		// stupid magic, fuck you mojang
+		Magic1:    magic1,
+		Magic2:    magic2,
+		Type:      statistic,
+		SessionId: sessionId,
+		Challenge: int32(code),
+	}
 
-	fmt.Println(response)
+	ec := new(bytes.Buffer)
+	binary.Write(ec, binary.LittleEndian, request)
+	fmt.Println("Dump request", hex.Dump(ec.Bytes()))
+	conn.Write(ec.Bytes())
+
+	data := make([]byte, 4096)
+	_, _, err = conn.ReadFromUDP(data)
+	if err != nil {
+		fmt.Println("Dying")
+		return response, err
+	}
+
+//	reader := helpers.Init(4, data)
+//	response.Type = reader.ReadByte()
+//	response.SessionId = reader.ReadShort()
+//	response.Motd = reader.ReadNullTermString()
+//	response.GameType = reader.ReadNullTermString()
+//	response.Map = reader.ReadNullTermString()
+//	response.NumPlayers = reader.ReadNullTermString()
+//	response.MaxPlayers = reader.ReadNullTermString()
+//	response.HostPort = reader.ReadShort()
+//	response.HostIp = reader.ReadNullTermString()
+//
+//	fmt.Println(response)
 	return response, nil
 }
 
-func doChallengeRequest() (string, error) {
+func requestChallengeCode() (string, error) {
 	request := challengeRequest{
-		Magic1:    '\xFE',
-		Magic2:    '\xFD',
-		Type:      '\x09',
-		SessionId: 1337,
+		Magic1:    magic1,
+		Magic2:    magic2,
+		Type:      handshake,
+		SessionId: sessionId,
 	}
 
 	encoder := new(bytes.Buffer)
@@ -119,28 +146,28 @@ func doChallengeRequest() (string, error) {
 		return "", err
 	}
 
-	response := new(challengeResponse)
-	err = binary.Read(encoder, binary.LittleEndian, response)
-	if err != nil {
-		return "", err
-	}
+	reader := helpers.Init(4, data)
+	response := challengeResponse{}
 
-	fmt.Println(response)
-	return string(response.ChallengeToken[:]), nil
+	response.Type = reader.ReadByte()
+	response.SessionId = reader.ReadShort()
+	response.ChallengeToken = reader.ReadNullTermString()
+
+	return response.ChallengeToken, nil
 }
 
-func (self *challengeResponse) parseChallengeResponse(data []byte) {
-	position := 0
-
-	self.Type, position = helpers.ReadByte(data, position)
-	self.SessionId, position = helpers.ReadShort(data, position)
-	token, position := helpers.ReadNullTermString(data, position)
-	self.ChallengeToken = []byte(token)
-
-	fmt.Println("Type", self.Type)
-	fmt.Println("SessionId", self.SessionId)
-	fmt.Println("Token", self.ChallengeToken)
-}
+//func (self *challengeResponse) parseChallengeResponse(data []byte) {
+//	reader := helpers.Init(4, data)
+//	self.Type = reader.ReadByte()
+//	self.SessionId = reader.ReadShort()
+//
+//	token, position := helpers.ReadNullTermString(data, position)
+//	self.ChallengeToken = []byte(token)
+//
+//	fmt.Println("Type", self.Type)
+//	fmt.Println("SessionId", self.SessionId)
+//	fmt.Println("Token", self.ChallengeToken)
+//}
 
 //func createPacket(command byte, challenge string) []byte {
 //	packet := []byte("\xFE\xFD")
